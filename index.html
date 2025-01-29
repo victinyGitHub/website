@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PIXI.js Retro Dialogue</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+        }
+        #gameCanvas {
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            width: 100vw !important;
+            height: 100vh !important;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        const textSpeed = 1;
+        // Wrap the initialization code in an async function
+        async function initApp() {
+            // Initialize PIXI Application with user's screen dimensions
+            const baseWidth = window.innerWidth;
+            const baseHeight = window.innerHeight;
+
+            const app = new PIXI.Application({
+                width: baseWidth,
+                height: baseHeight,
+                backgroundColor: 0x000010,
+                antialias: true,
+                resolution: window.devicePixelRatio || 1,
+                autoDensity: true,
+                resizeTo: window
+            });
+            document.body.appendChild(app.view);
+            app.view.id = 'gameCanvas';
+
+            // Dialogue data
+            const dialogue = await fetch('./dialogue.json', {
+                cache: 'no-store', // Forces a new request instead of using cache
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            })
+            .then(response => response.json())
+            .catch(error => {
+                console.error('Error loading dialogue:', error);
+                return {};
+            });
+
+            // Create container for all game elements
+            const gameContainer = new PIXI.Container();
+            app.stage.addChild(gameContainer);
+
+            // Create background container
+            const backgroundContainer = new PIXI.Container();
+            gameContainer.addChild(backgroundContainer);
+            gameContainer.setChildIndex(backgroundContainer, 0);
+
+            // Load and setup background
+            const bgTexture = await PIXI.Assets.load('./bg1.png');
+            const bgSprite = new PIXI.Sprite(bgTexture);
+
+            // Sizing up the background
+            bgSprite.width = baseWidth;
+            bgSprite.height = baseHeight;
+
+            // bgFX
+            const backgroundFilter = new PIXI.Filter(null, `
+                precision mediump float;
+                varying vec2 vTextureCoord;
+                uniform sampler2D uSampler;
+                uniform float time;
+
+                void main(void) {
+                    vec2 uv = vTextureCoord;
+                    vec4 color = texture2D(uSampler, uv);
+                    
+                    // Add a slight darkening effect
+                    color.rgb *= 0.5;
+                    
+                    gl_FragColor = color;
+                }
+            `);
+            bgSprite.filters = [backgroundFilter];
+
+            backgroundContainer.addChild(bgSprite);
+
+            // Scale button dimensions relative to screen size
+            const baseButtonWidth = Math.max(baseWidth * 0.2, 420); // 20% of screen width, max 300px
+            const baseButtonHeight = Math.max(baseHeight * 0.05, 40); // 5% of screen height, max 40px
+
+            // Update text styles relative to screen size
+            const dialogueStyle = new PIXI.TextStyle({
+                fontFamily: 'monospace',
+                fontSize: Math.max(baseHeight * 0.02, 16), // 1.8% of screen height, min 16px
+                lineHeight: Math.max(baseHeight * 0.03, 24),
+                fill: '#4ADE80',
+                wordWrap: true,
+                wordWrapWidth: baseWidth * 0.875,
+                leading: 4, // Extra pixels between lines
+                letterSpacing: 0, // Spacing between characters
+                padding: 10 // Padding around the text
+            });
+
+            const choiceStyle = new PIXI.TextStyle({
+                fontFamily: 'monospace',
+                fontSize: Math.max(baseHeight * 0.02, 14), // 1.6% of screen height, min 14px
+                fill: '#4ADE80',
+            });
+
+            // Update dialogue text positioning
+            const dialogueText = new PIXI.Text('', dialogueStyle);
+            dialogueText.position.set(
+                baseWidth * 0.0625,
+                baseHeight * 0.0833
+            );
+            gameContainer.addChild(dialogueText);
+
+            // Update choices container positioning
+            const choicesContainer = new PIXI.Container();
+            choicesContainer.position.set(
+                baseWidth * 0.0625,
+                baseHeight * 0.333
+            );
+            gameContainer.addChild(choicesContainer);
+
+            // CRT shader effect
+            const fragmentShader = `
+                precision mediump float;
+                varying vec2 vTextureCoord;
+                uniform sampler2D uSampler;
+                uniform float time;
+
+                void main(void) {
+                    vec2 uv = vTextureCoord;
+                    
+                    // Scanline effect
+                    float scanline = sin(uv.y * 800.0 + time * 10.0) * 0.02;
+                    
+                    // Color chromatic aberration
+                    vec4 color = texture2D(uSampler, uv);
+                    vec4 colorR = texture2D(uSampler, vec2(uv.x + 0.003, uv.y));
+                    vec4 colorB = texture2D(uSampler, vec2(uv.x - 0.003, uv.y));
+                    
+                    color.r = colorR.r;
+                    color.b = colorB.b;
+                    
+                    // Apply scanline
+                    color.rgb += vec3(scanline);
+                    
+                    // Vignette effect
+                    float vignette = length(vec2(0.5, 0.5) - uv) * 0.5;
+                    color.rgb *= (1.0 - vignette * 0.5);
+                    
+                    gl_FragColor = color;
+                }
+            `;
+
+            const crtFilter = new PIXI.Filter(null, fragmentShader, {
+                time: 0,
+            });
+            gameContainer.filters = [crtFilter];
+
+            // Animation loop
+            app.ticker.add((delta) => {
+                crtFilter.uniforms.time += delta * 0.01;
+            });
+
+            // Create interactive choice button
+            function createChoice(text, y, index, onClick) {
+                const container = new PIXI.Container();
+                
+                // Calculate responsive button dimensions
+                const buttonWidth = baseButtonWidth;
+                const buttonHeight = baseButtonHeight;
+                
+                // Button background
+                const background = new PIXI.Graphics();
+                background.lineStyle(2, 0x4ADE80, 0.3);
+                background.beginFill(0x000000, 0.4);
+                background.drawRoundedRect(0, 0, buttonWidth, buttonHeight, 5);
+                background.tint = 0x000000;
+                background.endFill();
+                container.addChild(background);
+                
+                // Button text with responsive positioning
+                const buttonText = new PIXI.Text(`> ${text}`, dialogueStyle);
+                buttonText.position.set(10, buttonHeight / 2 - buttonText.height / 2);
+                container.addChild(buttonText);
+                
+                // Update container position
+                container.position.set(baseWidth * 0.1, y);
+                
+                // Interactivity
+                container.eventMode = 'static';
+                container.cursor = 'pointer';
+
+                container.on('mouseover', () => {
+                    background.tint = 0x4ADE80;
+                    buttonText.style.fill = '#ffffff';
+                });
+
+                container.on('mouseout', () => {
+                    background.tint = 0x000000;
+                    buttonText.style.fill = '#4ADE80';
+                });
+
+                container.on('click', onClick);
+
+                // Update parallax effect to be relative to screen size
+                app.stage.on('mousemove', (e) => {
+                    const bounds = app.view.getBoundingClientRect();
+                    const mouseX = (e.clientX - bounds.left) / bounds.width - 0.5;
+                    const mouseY = (e.clientY - bounds.top) / bounds.height - 0.5;
+                    
+                    const parallaxX = mouseX * (app.screen.width * 0.2) * (index + 1);
+                    const parallaxY = mouseY * (app.screen.height * 0.2) * (index + 1);
+                    
+                    container.position.x = parallaxX;
+                    container.position.y = y + parallaxY;
+                });
+
+                return container;
+            }
+
+            // Display dialogue and choices
+            function showDialogue(dialogueId) {
+                const currentDialogue = dialogue[dialogueId];
+                
+                // Clear previous choices
+                choicesContainer.removeChildren();
+                
+                // Animate text appearance
+                let currentText = '';
+                const fullText = currentDialogue.text;
+                let charIndex = 0;
+                
+                const textInterval = setInterval(() => {
+                    if (charIndex < fullText.length) {
+                        currentText += fullText[charIndex];
+                        dialogueText.text = currentText;
+                        charIndex++;
+                    } else {
+                        clearInterval(textInterval);
+                        // Show choices after text is complete
+                        currentDialogue.choices.forEach((choice, index) => {
+                            const button = createChoice(
+                                choice.text,
+                                index * baseHeight * 0.075,
+                                index,
+                                () => showDialogue(choice.next)
+                            );
+                            choicesContainer.addChild(button);
+                        });
+                    }
+                }, textSpeed);
+            }
+
+            // Start with initial dialogue
+            showDialogue(0);
+
+            // Add post-processing effects
+            gameContainer.filters = [crtFilter];
+
+            // Add event listeners for resize
+            window.addEventListener('resize', resize);
+            window.addEventListener('orientationchange', resize);
+
+            // PROFILE PHOTO
+
+            // Create a container for the profile image
+            const profileContainer = new PIXI.Container();
+            gameContainer.addChild(profileContainer);
+
+            // Load and set up the profile image
+            const profileTexture = await PIXI.Assets.load('./camera1000.png'); // Replace with your image path
+            const profileSprite = new PIXI.Sprite(profileTexture);
+
+            // Size the profile image relative to screen height
+            const profileSize = baseHeight * 0.4; // 40% of screen height
+            profileSprite.width = profileSize;
+            profileSprite.height = profileSize;
+
+            // Position the profile image on the right side
+            profileSprite.position.set(
+                baseWidth * 0.6, // 60% across screen
+                baseHeight * 0.2  // 10% down from top
+            );
+
+            // Optional: Add a rounded rectangle mask for the profile picture
+            const mask = new PIXI.Graphics();
+            mask.beginFill(0xFFFFFF);
+            mask.drawRoundedRect(
+                profileSprite.x,
+                profileSprite.y,
+                profileSize,  // width
+                profileSize,  // height
+                20  // corner radius - adjust this value to change how rounded the corners are
+            );
+            mask.endFill();
+            profileSprite.mask = mask;
+
+            profileContainer.addChild(profileSprite);
+            profileContainer.addChild(mask);
+
+            // Add a glow effect to the profile image
+            const profileGlow = new PIXI.Graphics();
+            profileGlow.beginFill(0x4ADE80, 0.2);
+            profileGlow.drawRoundedRect(
+                profileSprite.x - 10, // Offset by glow size
+                profileSprite.y - 10, // Offset by glow size
+                profileSize + 20,     // Width plus glow on both sides
+                profileSize + 20,     // Height plus glow on both sides
+                20                    // Same corner radius as mask
+            );
+            profileGlow.endFill();
+            profileContainer.addChild(profileGlow);
+
+            // Update the resize handler
+            function resize() {
+                const w = window.innerWidth;
+                const h = window.innerHeight;
+                
+                const scale = Math.min(w / baseWidth, h / baseHeight);
+                
+                app.renderer.view.style.width = `${w}px`;
+                app.renderer.view.style.height = `${h}px`;
+                
+                gameContainer.scale.set(scale);
+                dialogueStyle.wordWrapWidth = w * 0.875;
+                
+                gameContainer.position.set(
+                    (w - baseWidth * scale) / 2,
+                    (h - baseHeight * scale) / 2
+                );
+
+                // Update profile container position if needed
+                const newProfileSize = h * 0.4;
+                profileSprite.width = newProfileSize;
+                profileSprite.height = newProfileSize;
+                
+                // Update mask position
+                mask.clear();
+                mask.beginFill(0xFFFFFF);
+                mask.drawRoundedRect(
+                    profileSprite.x,
+                    profileSprite.y,
+                    newProfileSize,  
+                    newProfileSize,  
+                    20  // corner radius - adjust this value to change how rounded the corners are
+                );
+                mask.endFill();
+
+                // Update glow position and size
+                profileGlow.clear();
+                profileGlow.beginFill(0x4ADE80, 0.2);
+                profileGlow.drawRoundedRect(
+                    profileSprite.x - 10,
+                    profileSprite.y - 10,
+                    newProfileSize + 20,
+                    newProfileSize + 20,
+                    20
+                );
+                profileGlow.endFill();
+
+                bgSprite.width = w/scale;
+                bgSprite.height = h/scale;
+                bgSprite.position.set(
+                    (baseWidth - w/scale) / 2,
+                    (baseHeight - h/scale) / 2
+                )
+            }
+
+            // Initial resize
+            resize();
+        }
+
+        // Call the initialization function
+        initApp().catch(error => {
+            console.error('Error initializing app:', error);
+        });
+    </script>
+</body>
+</html>
