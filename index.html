@@ -95,15 +95,21 @@
 
             backgroundContainer.addChild(bgSprite);
 
+            // PROFILE PHOTO
+
+            // Create a container for the profile image
+            const profileContainer = new PIXI.Container();
+            gameContainer.addChild(profileContainer);
+
             // Scale button dimensions relative to screen size
-            const baseButtonWidth = Math.max(baseWidth * 0.2, 420); // 20% of screen width, max 300px
-            const baseButtonHeight = Math.max(baseHeight * 0.05, 40); // 5% of screen height, max 40px
+            const baseButtonWidth = Math.max(baseWidth * 0.2, 200); // 20% of screen width, max 300px
+            const baseButtonHeight = Math.max(baseHeight * 0.05, 15); // 5% of screen height, max 40px
 
             // Update text styles relative to screen size
             const dialogueStyle = new PIXI.TextStyle({
                 fontFamily: 'monospace',
-                fontSize: Math.max(baseHeight * 0.02, 16), // 1.8% of screen height, min 16px
-                lineHeight: Math.max(baseHeight * 0.03, 24),
+                fontSize: Math.max(baseHeight * 0.02, 10), // 1.8% of screen height, min 16px
+                lineHeight: Math.max(baseHeight * 0.03, 16),
                 fill: '#4ADE80',
                 wordWrap: true,
                 wordWrapWidth: baseWidth * 0.875,
@@ -216,6 +222,7 @@
                 });
 
                 container.on('click', onClick);
+                container.on('touchStart', onClick);
 
                 // Update parallax effect to be relative to screen size
                 app.stage.on('mousemove', (e) => {
@@ -276,11 +283,6 @@
             window.addEventListener('resize', resize);
             window.addEventListener('orientationchange', resize);
 
-            // PROFILE PHOTO
-
-            // Create a container for the profile image
-            const profileContainer = new PIXI.Container();
-            gameContainer.addChild(profileContainer);
 
             // Load and set up the profile image
             const profileTexture = await PIXI.Assets.load('./camera1000.png'); // Replace with your image path
@@ -293,8 +295,8 @@
 
             // Position the profile image on the right side
             profileSprite.position.set(
-                baseWidth * 0.6, // 60% across screen
-                baseHeight * 0.2  // 10% down from top
+                baseWidth * 0.5, // 60% across screen
+                baseHeight * 0.05  // 10% down from top
             );
 
             // Optional: Add a rounded rectangle mask for the profile picture
@@ -345,7 +347,8 @@
                 );
 
                 // Update profile container position if needed
-                const newProfileSize = h * 0.4;
+                let minLength = Math.min(w, h);
+                const newProfileSize = (minLength * 0.5)/scale;
                 profileSprite.width = newProfileSize;
                 profileSprite.height = newProfileSize;
                 

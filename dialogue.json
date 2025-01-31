@@ -3,7 +3,7 @@
         "text": "Eleven : hey, im Xi. pronounced like Ξ the greek letter, or like Xi like Xi Jinping.",
         "choices": [
             { "text": "who r u", "next": 1 },
-            { "text": "?", "next": 2 },
+            { "text": "what is this place!!??", "next": 2 },
             { "text": "?", "next": 3 },
             { "text": "why does it say Eleven and not Xi?", "next": 6 }
         ]
@@ -29,7 +29,7 @@
         ]
     },
     "4": {
-        "text": "xi: yeah kinda. i'm studying cs at imperial right now as a 2nd year but i'm not sure i can keep saying that with how little i am on campus. for now i am avoiding professionalism, you can try hunt down my cv and linkedin but im not putting it here LOL",
+        "text": "xi: yeah kinda. i'm studying cs at imperial right now as a 2nd year but i'm not sure i can keep saying that with how little i am on campus. for now, i am avoiding professionalism; you can try hunt down my cv and linkedin but im not putting it here LOL",
         "choices": [
             { "text": "what are you up to if not your degree skull emoji x8", "next": 7 },
             { "text": "Go Back", "next": 1 }
@@ -48,7 +48,7 @@
         ]
     },
     "7": {
-        "text": "xide quests involve: \nmaking art, \nhosting [craft]: passion project making space, \nplanning my devious schemes, \nworking on video games, \nmaking playlists",
+        "text": "xide quests involve: \nmaking art, \nhosting [craft]: passion project making space, \nplanning my devious schemes, \nworking on video games, \nmaking playlists, \ncoop art experiments",
         "choices": [
             { "text": "art??!!!", "next": 8 },
             { "text": "what's [craft]?", "next": 9 },
