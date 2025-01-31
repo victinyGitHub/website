@@ -222,7 +222,9 @@
                 });
 
                 container.on('click', onClick);
-                container.on('touchStart', onClick);
+                container.on('touchstart', onClick);
+                container.on('pointerdown', onClick);
+                container.on('touchend', onClick);
 
                 // Update parallax effect to be relative to screen size
                 app.stage.on('mousemove', (e) => {
